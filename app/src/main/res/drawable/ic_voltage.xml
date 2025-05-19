@@ -1,12 +1,9 @@
-<!-- 示例：ic_voltage.xml -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/>
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <path
+      android:pathData="m320,880 l40,-280L160,600l360,-520h80l-40,320h240L400,880h-80Z"
+      android:fillColor="#e3e3e3"/>
 </vector>
-
-<!--<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/></svg>-->

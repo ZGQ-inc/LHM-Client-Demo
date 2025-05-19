@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -139,6 +140,8 @@ fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllParametersScreen(data: JsonRoot, onBack: () -> Unit) {
+    val expansionState = remember { ExpansionState() }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -151,38 +154,110 @@ fun AllParametersScreen(data: JsonRoot, onBack: () -> Unit) {
             )
         }
     ) { paddingValues ->
-        LazyColumn(modifier = Modifier.padding(paddingValues)) {
-            items(data.flatten()) { node ->
-                val iconRes = iconMap[node.Type] ?: iconMap["default"]!!
-                val color = typeColorMap[node.Type] ?: MaterialTheme.colorScheme.primary
-                Card(
+        LazyColumn(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+        ) {
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+            items(data.Children) { node ->
+                NodeItem(node, expansionState, 0)
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+    }
+}
+
+
+@Composable
+private fun NodeItem(
+    node: JsonRoot,
+    expansionState: ExpansionState,
+    indentLevel: Int
+) {
+    val hasChildren = node.Children.isNotEmpty()
+    val isExpanded = expansionState.isExpanded(node.id)
+
+    Card(
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .fillMaxWidth()
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .padding(start = (indentLevel * 24).dp)
+                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .clickable {
+                        if (hasChildren) {
+                            expansionState.toggle(node.id)
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (hasChildren) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (isExpanded) R.drawable.ic_arrow_down
+                            else R.drawable.ic_arrow_right
+                        ),
+                        contentDescription = if (isExpanded) "收起" else "展开",
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { expansionState.toggle(node.id) }
+                    )
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+
+                Icon(
+                    painter = painterResource(id = iconMap[node.Type] ?: R.drawable.ic_sensor),
+                    contentDescription = node.Type,
+                    tint = typeColorMap[node.Type] ?: MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+
+                Column(
                     modifier = Modifier
-                        .padding(8.dp)
-                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(start = 8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = iconRes),
-                            contentDescription = node.Type,
-                            tint = color,
-                            modifier = Modifier.size(24.dp)
+                    Text(
+                        text = node.Text,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    if (node.Value != null) {
+                        val values = listOfNotNull(
+//                            node.Min?.takeIf { it.isNotEmpty() }?.let { "最小: $it" },
+//                            node.Value?.takeIf { it.isNotEmpty() }?.let { "当前: $it" },
+//                            node.Max?.takeIf { it.isNotEmpty() }?.let { "最大: $it" }
+                            node.Value?.takeIf { it.isNotEmpty() }?.let { "$it" }
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(text = node.Text, style = MaterialTheme.typography.labelLarge)
-                            node.Value?.let {
-                                Text(text = it, style = MaterialTheme.typography.bodyLarge)
-                            }
+
+                        values.forEach { value ->
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
+                }
+            }
+
+            if (hasChildren && isExpanded) {
+                node.Children.forEach { child ->
+                    NodeItem(child, expansionState, indentLevel + 1)
                 }
             }
         }
     }
 }
+
+
 
 @Composable
 fun HardwareInfoDisplay(data: HardwareData) {
@@ -200,12 +275,28 @@ fun InfoCard(title: String, value: String) {
     Card(
         modifier = Modifier
             .padding(8.dp)
-            .fillMaxWidth()
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge)
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -414,3 +505,14 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
     }
 }
 
+class ExpansionState {
+    private val _expandedIds = mutableSetOf<Int>()
+    fun isExpanded(id: Int): Boolean = _expandedIds.contains(id)
+    fun toggle(id: Int) {
+        if (_expandedIds.contains(id)) {
+            _expandedIds.remove(id)
+        } else {
+            _expandedIds.add(id)
+        }
+    }
+}
