@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.zgqinc.lhmclientdemo
 
 import android.content.Context
@@ -30,9 +32,30 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import com.zgqinc.lhmclientdemo.ui.theme.LHMClientDemoTheme
+import android.app.Application
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.with
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.AndroidViewModel
+import java.util.Collections
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.ui.unit.sp
 
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -72,101 +95,221 @@ val iconMap: Map<String, Int>
     )
 
 val typeColorMap = mapOf(
-    "Voltage" to Color(0xFF6750A4),       // Purple (primary)
-    "Power" to Color(0xFFB3261E),         // Red (error)
-    "Clock" to Color(0xFF006494),         // Blue (secondary-like)
-    "Temperature" to Color(0xFFEF6C00),   // Deep orange (heat)
-    "Load" to Color(0xFF5D1049),          // Plum (intensity)
-    "Fan" to Color(0xFF018786),           // Teal (cooling)
-    "Throughput" to Color(0xFF7D5260),    // Muted pink-brown (data)
-    "Data" to Color(0xFF4E6056)           // Cool gray-green (stable)
+    "Voltage" to Color(0xFF6750A4),       // Primary (明亮紫)
+    "Power" to Color(0xFFDC362E),         // Error (明亮红)
+    "Clock" to Color(0xFF4285F4),         // Secondary (Google蓝)
+    "Temperature" to Color(0xFFFFB74D),   // Tertiary/橙黄（暖热）
+    "Load" to Color(0xFF9C27B0),          // 强度感的紫色
+    "Fan" to Color(0xFF00ACC1),           // 冷却感的青色
+    "Throughput" to Color(0xFF8E24AA),    // 数据传输感的洋红
+    "Data" to Color(0xFF607D8B)           // 稳定、沉着的灰蓝
 )
 
 
+
+private const val AnimationDurationMillis = 300
+
+@OptIn(ExperimentalAnimationApi::class)
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
     var serverAddress by remember { mutableStateOf("") }
     var showAllParameters by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val deviceHistory = remember { viewModel.getDeviceHistory() }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
-    if (showAllParameters && viewModel.hardwareJson != null) {
-        AllParametersScreen(viewModel.hardwareJson!!) {
-            showAllParameters = false
+    val AnimationDurationMillis = 300
+
+    LaunchedEffect(Unit) {
+        viewModel.getLastDevice()?.let {
+            serverAddress = it
+            viewModel.connectToServer(it)
         }
-        return
     }
 
-    Column(
-        modifier = Modifier
-            .padding(32.dp)
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        OutlinedTextField(
-            value = serverAddress,
-            onValueChange = { serverAddress = it },
-            label = { Text("输入IP/域名") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-            modifier = Modifier.fillMaxWidth()
-        )
+    AnimatedContent(
+        targetState = showAllParameters,
+        transitionSpec = {
+            if (targetState) {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(AnimationDurationMillis)
+                ) + fadeIn() with
+                        slideOutOfContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Left,
+                            animationSpec = tween(AnimationDurationMillis)
+                        ) + fadeOut()
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(AnimationDurationMillis)
+                ) + fadeIn() with
+                        slideOutOfContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Right,
+                            animationSpec = tween(AnimationDurationMillis)
+                        ) + fadeOut()
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    ) { showAll ->
+        if (showAll && viewModel.hardwareJson != null) {
+            AllParametersScreen(viewModel.hardwareJson!!) {
+                showAllParameters = false
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp)
+                        .padding(bottom = 80.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ExposedDropdownMenuBox(
+                        expanded = menuExpanded,
+                        onExpandedChange = { menuExpanded = it },
+                        modifier = Modifier.animateContentSize()
+                    ) {
+                        OutlinedTextField(
+                            value = serverAddress,
+                            onValueChange = { serverAddress = it },
+                            label = { Text("设备IP/域名") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .clickable { menuExpanded = true },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuExpanded)
+                            }
+                        )
 
-        Button(
-            onClick = {
-                if (serverAddress.isNotBlank()) {
-                    viewModel.connectToServer(serverAddress)
+                        ExposedDropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            deviceHistory.forEach { device ->
+                                DropdownMenuItem(
+                                    text = { Text(device) },
+                                    onClick = {
+                                        serverAddress = device
+                                        menuExpanded = false
+                                        viewModel.connectToServer(device)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    when (val status = viewModel.connectionStatus) {
+                        is ConnectionStatus.Error -> ErrorMessage(status.message)
+                        is ConnectionStatus.Connecting -> LoadingIndicator()
+                        is ConnectionStatus.Connected -> {
+                            viewModel.hardwareData?.let {
+                                HardwareInfoDisplay(it)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(onClick = { showAllParameters = true }) {
+                                    Text("查看全部参数")
+                                }
+                            }
+                        }
+                        ConnectionStatus.Disconnected -> {}
+                    }
                 }
-            },
-            modifier = Modifier.padding(vertical = 16.dp)
-        ) {
-            Text("连接")
-        }
 
-        when (val status = viewModel.connectionStatus) {
-            is ConnectionStatus.Error -> ErrorMessage(status.message)
-            is ConnectionStatus.Connecting -> LoadingIndicator()
-            is ConnectionStatus.Connected -> {
-                viewModel.hardwareData?.let {
-                    HardwareInfoDisplay(it)
-                    Button(onClick = { showAllParameters = true }) {
-                        Text("查看全部参数")
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp)
+                ) {
+                    Button(
+                        onClick = { showAboutDialog = true },
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("关于", fontSize = 14.sp)
                     }
                 }
             }
-            ConnectionStatus.Disconnected -> {}
         }
     }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = { Text("关于") },
+            text = { Text("没想好写什么。") },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
 }
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllParametersScreen(data: JsonRoot, onBack: () -> Unit) {
-    val expansionState = remember { ExpansionState() }
+    val density = LocalDensity.current
+    var visible by remember { mutableStateOf(true) }
+    var backClicked by remember { mutableStateOf(false) }
+    var backDisabled by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("全部参数") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                }
-            )
+    if (backClicked) {
+        LaunchedEffect(Unit) {
+
+            delay(AnimationDurationMillis.toLong())
+            onBack()
         }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-        ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-            items(data.Children) { node ->
-                NodeItem(node, expansionState, 0)
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally { with(density) { 300.dp.roundToPx() } } + fadeIn(),
+        exit = slideOutHorizontally { with(density) { -300.dp.roundToPx() } } + fadeOut()
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("全部参数") },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                if (!backDisabled) {
+                                    backDisabled = true
+                                    visible = false
+                                    backClicked = true
+                                }
+                            },
+                            enabled = !backDisabled
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                )
             }
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+        ) { paddingValues ->
+            LazyColumn(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
+            ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+                items(data.Children) { node ->
+                    NodeItem(node, remember { ExpansionState() }, 0)
+                }
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+            }
         }
     }
 }
+
 
 
 @Composable
@@ -178,34 +321,34 @@ private fun NodeItem(
     val hasChildren = node.Children.isNotEmpty()
     val isExpanded = expansionState.isExpanded(node.id)
 
-    Card(
+    Column(
         modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .animateContentSize() // 对整块做动画
             .fillMaxWidth()
     ) {
-        Column {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .fillMaxWidth()
+                .clickable(enabled = hasChildren) { expansionState.toggle(node.id) }
+                .animateContentSize(), // 点击卡片动画过渡
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
             Row(
                 modifier = Modifier
                     .padding(start = (indentLevel * 24).dp)
                     .padding(16.dp)
-                    .fillMaxWidth()
-                    .clickable {
-                        if (hasChildren) {
-                            expansionState.toggle(node.id)
-                        }
-                    },
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (hasChildren) {
                     Icon(
                         painter = painterResource(
-                            id = if (isExpanded) R.drawable.ic_arrow_down
-                            else R.drawable.ic_arrow_right
+                            id = if (isExpanded) R.drawable.ic_arrow_down else R.drawable.ic_arrow_right
                         ),
                         contentDescription = if (isExpanded) "收起" else "展开",
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable { expansionState.toggle(node.id) }
+                        modifier = Modifier.size(24.dp)
                     )
                 } else {
                     Spacer(modifier = Modifier.size(24.dp))
@@ -223,35 +366,17 @@ private fun NodeItem(
                         .weight(1f)
                         .padding(start = 8.dp)
                 ) {
-                    Text(
-                        text = node.Text,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    if (node.Value != null) {
-                        val values = listOfNotNull(
-//                            node.Min?.takeIf { it.isNotEmpty() }?.let { "最小: $it" },
-//                            node.Value?.takeIf { it.isNotEmpty() }?.let { "当前: $it" },
-//                            node.Max?.takeIf { it.isNotEmpty() }?.let { "最大: $it" }
-                            node.Value?.takeIf { it.isNotEmpty() }?.let { "$it" }
-                        )
-
-                        values.forEach { value ->
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    Text(node.Text, style = MaterialTheme.typography.titleMedium)
+                    node.Value?.takeIf { it.isNotEmpty() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
+        }
 
-            if (hasChildren && isExpanded) {
-                node.Children.forEach { child ->
-                    NodeItem(child, expansionState, indentLevel + 1)
-                }
+        if (hasChildren && isExpanded) {
+            node.Children.forEach { child ->
+                NodeItem(child, expansionState, indentLevel + 1)
             }
         }
     }
@@ -259,8 +384,12 @@ private fun NodeItem(
 
 
 
+
 @Composable
-fun HardwareInfoDisplay(data: HardwareData) {
+fun HardwareInfoDisplay(
+    data: HardwareData,
+//    modifier: Modifier = Modifier
+) {
     Column(modifier = Modifier.padding(4.dp)) {
         InfoCard("设备", data.deviceName)
         InfoCard("CPU使用率", "${data.cpuUsage}%")
@@ -271,35 +400,43 @@ fun HardwareInfoDisplay(data: HardwareData) {
 }
 
 @Composable
-fun InfoCard(title: String, value: String) {
-    Card(
-        modifier = Modifier
-            .padding(8.dp)
-            .fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+fun InfoCard(
+    title: String,
+    value: String,
+    visible: Boolean = true
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally(initialOffsetX = { it / 2 }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
     ) {
-        Column(
+        Card(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
+                .padding(8.dp)
+                .fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
         }
     }
 }
+
 
 @Composable
 fun ErrorMessage(message: String) {
@@ -309,26 +446,18 @@ fun ErrorMessage(message: String) {
             .padding(8.dp)
             .fillMaxWidth()
     ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(16.dp),
-            style = MaterialTheme.typography.bodyLarge
-        )
+        Text(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(16.dp))
     }
 }
 
 @Composable
 fun LoadingIndicator() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
 
-class HardwareViewModel : ViewModel() {
+class HardwareViewModel(application: Application) : AndroidViewModel(application) {
     var hardwareData by mutableStateOf<HardwareData?>(null)
     var hardwareJson by mutableStateOf<JsonRoot?>(null)
     var connectionStatus by mutableStateOf<ConnectionStatus>(ConnectionStatus.Disconnected)
@@ -336,7 +465,31 @@ class HardwareViewModel : ViewModel() {
     private val client = OkHttpClient()
     private val gson = Gson()
     private var fetchJob: Job? = null
+    private val prefs = application.getSharedPreferences("device_prefs", Context.MODE_PRIVATE)
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    fun saveDeviceHistory(address: String) {
+        val history = getDeviceHistory().toMutableList().apply {
+            remove(address)
+            add(0, address)
+            if (size > 10) removeLast()
+        }
+        prefs.edit().putString("history", gson.toJson(history)).apply()
+    }
+
+    fun getDeviceHistory(): List<String> {
+        return gson.fromJson(prefs.getString("history", null), Array<String>::class.java)?.toList() ?: emptyList()
+    }
+
+    fun saveLastDevice(address: String) {
+        prefs.edit().putString("last_device", address).apply()
+    }
+
+    fun getLastDevice(): String? {
+        return prefs.getString("last_device", null)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun connectToServer(address: String) {
         fetchJob?.cancel()
         hardwareData = null
@@ -346,8 +499,16 @@ class HardwareViewModel : ViewModel() {
         fetchJob = viewModelScope.launch {
             try {
                 while (isActive) {
-                    withContext(Dispatchers.IO) { fetchData(address) }
-                    connectionStatus = ConnectionStatus.Connected
+                    try {
+                        withContext(Dispatchers.IO) { fetchData(address) }
+                        connectionStatus = ConnectionStatus.Connected
+                        saveDeviceHistory(address)
+                        saveLastDevice(address)
+                        delay(1000)
+                    } catch (e: Exception) {
+                        connectionStatus = ConnectionStatus.Error(e.message ?: "获取数据失败")
+                        cancel() // 停止循环
+                    }
                     delay(1000)
                 }
             } catch (e: IOException) {
@@ -356,22 +517,31 @@ class HardwareViewModel : ViewModel() {
         }
     }
 
-    private suspend fun fetchData(address: String) {
+    private fun fetchData(address: String) {
         val host = address.trim().trimEnd('/')
         val urls = listOf(
-            { "https://$host/data.json" },
-            { "http://$host/data.json" },
-            { "$host/data.json" }
+            "https://$host/data.json",
+            "http://$host/data.json",
+            "$host/data.json"
         )
         var lastEx: IOException? = null
         for (u in urls) {
             try {
-                client.newCall(Request.Builder().url(u()).build()).execute().use { resp ->
+                client.newCall(Request.Builder().url(u).build()).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val json = resp.body?.string().orEmpty()
-                        val parsed = gson.fromJson(json, JsonRoot::class.java)
+                        val parsed = try {
+                            gson.fromJson(json, JsonRoot::class.java)
+                        } catch (e: Exception) {
+                            throw IOException("JSON解析错误")
+                        }
+                        if (parsed == null) throw IOException("解析结果为空")
                         hardwareJson = parsed
-                        hardwareData = parsed.toHardwareData()
+                        hardwareData = try {
+                            parsed.toHardwareData()
+                        } catch (e: Exception) {
+                            null
+                        }
                         return
                     } else {
                         lastEx = IOException("HTTP ${resp.code}")
@@ -381,7 +551,7 @@ class HardwareViewModel : ViewModel() {
                 lastEx = e
             }
         }
-        throw lastEx ?: IOException("Unknown fetch error")
+        throw lastEx ?: IOException("未知获取错误")
     }
 
     private fun JsonRoot.toHardwareData(): HardwareData {
@@ -396,6 +566,7 @@ class HardwareViewModel : ViewModel() {
         )
     }
 }
+
 
 // 数据结构
 data class HardwareData(
@@ -427,7 +598,6 @@ sealed class ConnectionStatus {
     data class Error(val message: String) : ConnectionStatus()
 }
 
-// JSON解析
 fun JsonRoot.findNodeByText(predicate: (String) -> Boolean): JsonRoot? {
     if (predicate(this.Text)) return this
     for (child in Children) {
@@ -445,8 +615,7 @@ fun JsonRoot.findAllNodes(predicate: (JsonRoot) -> Boolean): List<JsonRoot> {
     return results
 }
 
-fun JsonRoot.flatten(): List<JsonRoot> =
-    listOf(this) + Children.flatMap { it.flatten() }
+fun JsonRoot.flatten(): List<JsonRoot> = listOf(this) + Children.flatMap { it.flatten() }
 
 fun JsonRoot.findCpuUsage(): Float {
     return findNodeByText { it.contains("CPU Total", ignoreCase = true) }
@@ -454,20 +623,20 @@ fun JsonRoot.findCpuUsage(): Float {
 }
 
 fun JsonRoot.findGpuUsage(): Float {
-    return findAllNodes { it.Text.equals("GPU Core", ignoreCase = true) && it.Type == "Load" }
+    return findAllNodes { it.Text.equals("GPU Core", true) && it.Type == "Load" }
         .firstOrNull()?.Value?.replace("%", "")?.toFloatOrNull() ?: 0f
 }
 
 fun JsonRoot.findMemoryUsed(): Float {
-    return findNodeByText { it.equals("Memory Used", ignoreCase = true) }
+    return findNodeByText { it.equals("Memory Used", true) }
         ?.Value?.replace("GB", "")?.toFloatOrNull() ?: 0f
 }
 
 fun JsonRoot.findMemoryTotal(): Float {
     val used = findMemoryUsed()
-    val available = findNodeByText { it.equals("Memory Available", ignoreCase = true) }
+    val available = findNodeByText { it.equals("Memory Available", true) }
         ?.Value?.replace("GB", "")?.toFloatOrNull() ?: 0f
-    return String.format("%.0f", used + available).toFloat()
+    return used + available
 }
 
 fun JsonRoot.findNetworkSpeed(type: String): String {
@@ -475,12 +644,8 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
         if (value.isNullOrBlank()) return 0f
         val v = value.trim()
         return when {
-            v.endsWith("GB/s", true) -> v.removeSuffix("GB/s").trim().toFloatOrNull()
-                ?.times(1024 * 1024) ?: 0f
-
-            v.endsWith("MB/s", true) -> v.removeSuffix("MB/s").trim().toFloatOrNull()?.times(1024)
-                ?: 0f
-
+            v.endsWith("GB/s", true) -> v.removeSuffix("GB/s").trim().toFloatOrNull()?.times(1024 * 1024) ?: 0f
+            v.endsWith("MB/s", true) -> v.removeSuffix("MB/s").trim().toFloatOrNull()?.times(1024) ?: 0f
             v.endsWith("KB/s", true) -> v.removeSuffix("KB/s").trim().toFloatOrNull() ?: 0f
             else -> 0f
         }
@@ -490,17 +655,15 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
     val matching = nodes.filter { node ->
         node.Type == "Throughput" &&
                 node.Text.contains(type, true) &&
-                nodes.any {
-                    it.Children.contains(node) &&
-                            (it.Text.contains("WLAN", true) || it.Text.contains("以太网", true))
-                }
+                nodes.any { it.Children.contains(node) &&
+                        (it.Text.contains("WLAN", true) || it.Text.contains("以太网", true)) }
     }
 
     val totalKB = matching.sumOf { parseSpeed(it.Value).toDouble() }
 
     return when {
-        totalKB >= 1024 * 1024 -> String.format("%.1f GB/s", totalKB / 1024f / 1024f)
-        totalKB >= 1024 -> String.format("%.1f MB/s", totalKB / 1024f)
+        totalKB >= 1024 * 1024 -> String.format("%.1f GB/s", totalKB / 1024 / 1024)
+        totalKB >= 1024 -> String.format("%.1f MB/s", totalKB / 1024)
         else -> String.format("%.0f KB/s", totalKB)
     }
 }
@@ -509,10 +672,6 @@ class ExpansionState {
     private val _expandedIds = mutableSetOf<Int>()
     fun isExpanded(id: Int): Boolean = _expandedIds.contains(id)
     fun toggle(id: Int) {
-        if (_expandedIds.contains(id)) {
-            _expandedIds.remove(id)
-        } else {
-            _expandedIds.add(id)
-        }
+        if (_expandedIds.contains(id)) _expandedIds.remove(id) else _expandedIds.add(id)
     }
 }

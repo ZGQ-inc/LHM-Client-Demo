@@ -65,4 +65,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+
+    implementation("androidx.compose.animation:animation:1.6.0")
+    implementation("androidx.compose.foundation:foundation:1.6.0")
 }
