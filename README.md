@@ -98,7 +98,7 @@ LibreHardwareMonitor 启动 Web Server 功能后，会生成一个 `data.json` �
 >
 >平均数据时间范围（默认 10 分钟）
 >
->是否启用 HTTP auth（参考 LHM）
+>是否启用 HTTP auth
 >
 >设备备注
 
@@ -118,7 +118,7 @@ LibreHardwareMonitor 启动 Web Server 功能后，会生成一个 `data.json` �
 >
 >一键恢复默认设置（保留设备列表）
 >
->导入/导出配置（JSON，含设备列表，文件名加时间戳，如 `config_20231001.json`）
+>导入/导出配置（JSON，含设备列表，文件名加时间戳，如 `config_19861106.json`）
 
 - [ ] 自动重连（默认 30 秒）
 
