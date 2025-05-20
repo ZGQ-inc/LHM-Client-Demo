@@ -118,7 +118,7 @@ LibreHardwareMonitor 启动 Web Server 功能后，会生成一个 `data.json` �
 >
 >一键恢复默认设置（保留设备列表）
 >
->导入/导出配置（JSON，含设备列表，文件名加时间戳，如 `config_19861106.json`）
+>导入/导出配置（JSON，含设备列表，文件名加时间戳，如 `config_19831106.json`）
 
 - [ ] 自动重连（默认 30 秒）
 
