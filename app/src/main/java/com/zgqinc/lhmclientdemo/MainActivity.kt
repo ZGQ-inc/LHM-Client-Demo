@@ -203,7 +203,19 @@ fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+
+                    Button(
+                        onClick = {
+                            if (serverAddress.isNotBlank()) {
+                                viewModel.connectToServer(serverAddress)
+                            }
+                        },
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    ) {
+                        Text("连接")
+                    }
+
+//                    Spacer(modifier = Modifier.height(32.dp))
 
                     when (val status = viewModel.connectionStatus) {
                         is ConnectionStatus.Error -> ErrorMessage(status.message)
