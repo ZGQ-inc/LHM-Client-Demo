@@ -22,7 +22,7 @@ LibreHardwareMonitor 启动 Web Server 功能后，会生成一个 `data.json` �
 
 ## 已知问题
 
-* 网络层速度无法显示
+* 网络速度无法显示
 
 * fetch不到会报错并不会自动重连
 
