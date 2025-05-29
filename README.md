@@ -24,8 +24,6 @@ LibreHardwareMonitor 启动 Web Server 功能后，会生成一个 `data.json` �
 
 * 网络速度无法显示
 
-* fetch不到会报错并不会自动重连，进入墓碑模式后热启动不会fetch数据
-
 ## 技术栈
 
 * Kotlin + AndroidX

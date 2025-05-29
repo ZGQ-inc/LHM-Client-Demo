@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
+//import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
@@ -47,17 +47,38 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.with
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.ui.platform.LocalDensity
+//import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.AndroidViewModel
-import java.util.Collections
+//import java.util.Collections
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+//import androidx.lifecycle.LifecycleOwner
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.runtime.LaunchedEffect
+//import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalUriHandler
+//import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextOverflow
+//import androidx.compose.ui.unit.TextUnit
+//import androidx.compose.ui.unit.TextUnitType
+//import java.util.concurrent.ConcurrentHashMap
 
 
 class MainActivity : ComponentActivity() {
+
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         if (!isNetworkAvailable()) {
             Toast.makeText(this, "当前无网络连接，请检查网络设置", Toast.LENGTH_LONG).show()
@@ -73,7 +94,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun isNetworkAvailable(): Boolean {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         return cm.activeNetworkInfo?.isConnected == true
     }
 }
@@ -105,21 +126,36 @@ val typeColorMap = mapOf(
     "Data" to Color(0xFF607D8B)           // 稳定、沉着的灰蓝
 )
 
-
-
 private const val AnimationDurationMillis = 300
 
 @OptIn(ExperimentalAnimationApi::class)
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
-fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
+fun MainScreen() {
+    val viewModel: HardwareViewModel = viewModel()
     var serverAddress by remember { mutableStateOf("") }
     var showAllParameters by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     val deviceHistory = remember { viewModel.getDeviceHistory() }
     var showAboutDialog by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
 
-    val AnimationDurationMillis = 300
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                coroutineScope.launch {
+                    viewModel.reconnectIfNeeded()
+                }
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.getLastDevice()?.let {
@@ -133,21 +169,21 @@ fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
         transitionSpec = {
             if (targetState) {
                 slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(AnimationDurationMillis)
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(300)
                 ) + fadeIn() with
                         slideOutOfContainer(
-                            AnimatedContentTransitionScope.SlideDirection.Left,
-                            animationSpec = tween(AnimationDurationMillis)
+                            towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                            animationSpec = tween(300)
                         ) + fadeOut()
             } else {
                 slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(AnimationDurationMillis)
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(300)
                 ) + fadeIn() with
                         slideOutOfContainer(
-                            AnimatedContentTransitionScope.SlideDirection.Right,
-                            animationSpec = tween(AnimationDurationMillis)
+                            towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                            animationSpec = tween(300)
                         ) + fadeOut()
             }
         },
@@ -250,10 +286,57 @@ fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
     }
 
     if (showAboutDialog) {
+        val uriHandler = LocalUriHandler.current
+        val annotatedText = buildAnnotatedString {
+            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
+                append("个人主页：")
+            }
+
+            pushStringAnnotation(tag = "URL", annotation = "https://domain.zgqinc.gq")
+            withStyle(
+                style = SpanStyle(
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline
+                )
+            ) {
+                append("domain.zgqinc.gq")
+            }
+            pop()
+
+            append("\n\n")
+
+            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
+                append("项目地址：")
+            }
+
+            pushStringAnnotation(tag = "GITHUB", annotation = "https://github.com/ZGQ-inc/LHM-Client-Demo")
+            withStyle(
+                style = SpanStyle(
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline
+                )
+            ) {
+                append("ZGQ-inc/LHM-Client-Demo")
+            }
+            pop()
+        }
+
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
             title = { Text("关于") },
-            text = { Text("没想好写什么。") },
+            text = {
+                ClickableText(
+                    text = annotatedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    onClick = { offset ->
+                        annotatedText.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                            .firstOrNull()?.let { uriHandler.openUri(it.item) }
+
+                        annotatedText.getStringAnnotations(tag = "GITHUB", start = offset, end = offset)
+                            .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) {
                     Text("关闭")
@@ -261,68 +344,40 @@ fun MainScreen(viewModel: HardwareViewModel = viewModel()) {
             }
         )
     }
+
 }
 
-
-
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AllParametersScreen(data: JsonRoot, onBack: () -> Unit) {
-    val density = LocalDensity.current
-    var visible by remember { mutableStateOf(true) }
-    var backClicked by remember { mutableStateOf(false) }
-    var backDisabled by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
-    if (backClicked) {
-        LaunchedEffect(Unit) {
-
-            delay(AnimationDurationMillis.toLong())
-            onBack()
-        }
-    }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInHorizontally { with(density) { 300.dp.roundToPx() } } + fadeIn(),
-        exit = slideOutHorizontally { with(density) { -300.dp.roundToPx() } } + fadeOut()
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("全部参数") },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                if (!backDisabled) {
-                                    backDisabled = true
-                                    visible = false
-                                    backClicked = true
-                                }
-                            },
-                            enabled = !backDisabled
-                        ) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                        }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("全部参数") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                     }
-                )
-            }
-        ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-            ) {
-                item { Spacer(modifier = Modifier.height(8.dp)) }
-                items(data.Children) { node ->
-                    NodeItem(node, remember { ExpansionState() }, 0)
                 }
-                item { Spacer(modifier = Modifier.height(8.dp)) }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+        ) {
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+            items(data.Children) { node ->
+                NodeItem(node, remember { ExpansionState() }, 0)
             }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
         }
     }
 }
-
-
 
 @Composable
 private fun NodeItem(
@@ -332,25 +387,30 @@ private fun NodeItem(
 ) {
     val hasChildren = node.Children.isNotEmpty()
     val isExpanded = expansionState.isExpanded(node.id)
+    val colorScheme = MaterialTheme.colorScheme
+    val containerColor = remember(node.Type, colorScheme) {
+        typeColorMap[node.Type] ?: colorScheme.surfaceVariant
+    }
 
-    Column(
-        modifier = Modifier
-            .animateContentSize() // 对整块做动画
-            .fillMaxWidth()
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Card(
             modifier = Modifier
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .fillMaxWidth()
-                .clickable(enabled = hasChildren) { expansionState.toggle(node.id) }
-                .animateContentSize(), // 点击卡片动画过渡
+                .clickable(enabled = hasChildren) { expansionState.toggle(node.id)
+                                                  },
+//            colors = CardDefaults.cardColors(containerColor = containerColor),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Row(
                 modifier = Modifier
-                    .padding(start = (indentLevel * 24).dp)
-                    .padding(16.dp)
+                    .padding(
+                        start = (indentLevel * 16).dp,
+                        top = 12.dp,
+                        end = 16.dp,
+                        bottom = 12.dp
+                    )
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -360,27 +420,38 @@ private fun NodeItem(
                             id = if (isExpanded) R.drawable.ic_arrow_down else R.drawable.ic_arrow_right
                         ),
                         contentDescription = if (isExpanded) "收起" else "展开",
-                        modifier = Modifier.size(24.dp)
-                    )
+                        modifier = Modifier.size(20.dp))
                 } else {
-                    Spacer(modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.size(20.dp))
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Icon(
                     painter = painterResource(id = iconMap[node.Type] ?: R.drawable.ic_sensor),
                     contentDescription = node.Type,
-                    tint = typeColorMap[node.Type] ?: MaterialTheme.colorScheme.primary,
+                    tint = typeColorMap[node.Type] ?: colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp)
-                ) {
-                    Text(node.Text, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = node.Text,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
                     node.Value?.takeIf { it.isNotEmpty() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 14.sp,
+                            color = colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
                     }
                 }
             }
@@ -393,9 +464,6 @@ private fun NodeItem(
         }
     }
 }
-
-
-
 
 @Composable
 fun HardwareInfoDisplay(
@@ -427,12 +495,14 @@ fun InfoCard(
                 .padding(8.dp)
                 .fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+//            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth()
+                    .background(Color.Transparent)
             ) {
                 Text(
                     text = title,
@@ -449,11 +519,11 @@ fun InfoCard(
     }
 }
 
-
 @Composable
 fun ErrorMessage(message: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+//        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = Modifier
             .padding(8.dp)
             .fillMaxWidth()
@@ -478,6 +548,17 @@ class HardwareViewModel(application: Application) : AndroidViewModel(application
     private val gson = Gson()
     private var fetchJob: Job? = null
     private val prefs = application.getSharedPreferences("device_prefs", Context.MODE_PRIVATE)
+    private var currentAddress: String? = null
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    fun reconnectIfNeeded() {
+        currentAddress?.let { address ->
+            if (connectionStatus == ConnectionStatus.Disconnected ||
+                connectionStatus is ConnectionStatus.Error) {
+                connectToServer(address)
+            }
+        }
+    }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun saveDeviceHistory(address: String) {
@@ -507,6 +588,7 @@ class HardwareViewModel(application: Application) : AndroidViewModel(application
         hardwareData = null
         hardwareJson = null
         connectionStatus = ConnectionStatus.Connecting
+        currentAddress = address
 
         fetchJob = viewModelScope.launch {
             try {
@@ -517,9 +599,10 @@ class HardwareViewModel(application: Application) : AndroidViewModel(application
                         saveDeviceHistory(address)
                         saveLastDevice(address)
                         delay(1000)
+                    } catch (e: CancellationException) {
                     } catch (e: Exception) {
                         connectionStatus = ConnectionStatus.Error(e.message ?: "获取数据失败")
-                        cancel() // 停止循环
+                        cancel()
                     }
                     delay(1000)
                 }
@@ -578,7 +661,6 @@ class HardwareViewModel(application: Application) : AndroidViewModel(application
         )
     }
 }
-
 
 // 数据结构
 data class HardwareData(
@@ -651,6 +733,7 @@ fun JsonRoot.findMemoryTotal(): Float {
     return used + available
 }
 
+// TODO 修复网络速度计算
 fun JsonRoot.findNetworkSpeed(type: String): String {
     fun parseSpeed(value: String?): Float {
         if (value.isNullOrBlank()) return 0f
@@ -659,6 +742,7 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
             v.endsWith("GB/s", true) -> v.removeSuffix("GB/s").trim().toFloatOrNull()?.times(1024 * 1024) ?: 0f
             v.endsWith("MB/s", true) -> v.removeSuffix("MB/s").trim().toFloatOrNull()?.times(1024) ?: 0f
             v.endsWith("KB/s", true) -> v.removeSuffix("KB/s").trim().toFloatOrNull() ?: 0f
+            v.endsWith("B/s", true) -> v.removeSuffix("B/s").trim().toFloatOrNull()?.div(1024) ?: 0f
             else -> 0f
         }
     }
@@ -667,8 +751,13 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
     val matching = nodes.filter { node ->
         node.Type == "Throughput" &&
                 node.Text.contains(type, true) &&
-                nodes.any { it.Children.contains(node) &&
-                        (it.Text.contains("WLAN", true) || it.Text.contains("以太网", true)) }
+                nodes.any { parent ->
+                    parent.Children.contains(node) &&
+                            (parent.Text.contains("WLAN", true) ||
+                                    parent.Text.contains("以太网", true) ||
+                                    parent.Text.contains("Bluetooth", true) ||
+                                    parent.Text.contains("蓝牙", true))
+                }
     }
 
     val totalKB = matching.sumOf { parseSpeed(it.Value).toDouble() }
@@ -676,7 +765,8 @@ fun JsonRoot.findNetworkSpeed(type: String): String {
     return when {
         totalKB >= 1024 * 1024 -> String.format("%.1f GB/s", totalKB / 1024 / 1024)
         totalKB >= 1024 -> String.format("%.1f MB/s", totalKB / 1024)
-        else -> String.format("%.0f KB/s", totalKB)
+        totalKB > 0 -> String.format("%.0f KB/s", totalKB)
+        else -> "0 KB/s"
     }
 }
 
