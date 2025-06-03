@@ -12,8 +12,8 @@ android {
         applicationId = "com.zgqinc.lhmclientdemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 151
+        versionName = "1.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -68,4 +68,7 @@ dependencies {
 
     implementation("androidx.compose.animation:animation:1.6.0")
     implementation("androidx.compose.foundation:foundation:1.6.0")
+
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.0")
+    implementation("androidx.compose.runtime:runtime-livedata:1.5.0")
 }
